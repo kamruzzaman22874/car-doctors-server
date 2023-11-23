@@ -1,5 +1,6 @@
 const express = require('express')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
 const app = express()
 require('dotenv').config()
 const cors = require('cors')
@@ -24,6 +25,40 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: "unauthorized access" })
+    }
+    const token = authorization.split(" ")[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ error: true, message: "unauthorized access" })
+        }
+        req.decoded = decoded
+        next()
+    });
+
+}
+
+
+// const verifyJWT = (req, res, next) => {
+//     const authorization = req.headers.authorization;
+//     if (!authorization) {
+//         return res.status(403).send({ error: true, message: "unauthorized access" });
+//     }
+//     const token = authorization.split(' ')[1];
+//     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+//         if (err) {
+//             return res.status(403).send({
+//                 error: true, message: "unauthorized access"
+//             })
+//         }
+//         req.decoded = decoded;
+//         next();
+//     });
+// }
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -32,6 +67,12 @@ async function run() {
 
         await client.connect();
 
+        // jwt
+        app.post("/jwt", (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            res.send({ token })
+        })
 
         // Services Apis
 
@@ -52,10 +93,10 @@ async function run() {
 
         // Booking Apis 
 
-        app.get("/bookings", async (req, res) => {
+        app.get("/bookings", verifyJWT, async (req, res) => {
             let query = {}
             if (req.query?.email) {
-                query = { email: req.query.email }
+                query = { email: req.query?.email }
             }
             const result = await bookingsCollection.find(query).toArray();
             res.send(result);
@@ -63,7 +104,6 @@ async function run() {
 
         app.post("/bookings", async (req, res) => {
             const booking = req.body;
-            console.log(booking)
             const result = await bookingsCollection.insertOne(booking)
             res.send(result);
         })
