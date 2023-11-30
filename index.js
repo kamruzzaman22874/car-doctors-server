@@ -58,7 +58,16 @@ async function run() {
         // Services Apis
 
         app.get("/services", async (req, res) => {
-            const result = await servicesCollection.find().toArray();
+            const sort = req.query.sort;
+            const search = req.query.search;
+            // const query = {};
+            const query = { title: { $regex: search, $options: "i" } }
+            const options = {
+                sort: {
+                    "price": sort === "assending" ? 1 : -1
+                },
+            };
+            const result = await servicesCollection.find(query, options).toArray();
             res.send(result);
         })
 
